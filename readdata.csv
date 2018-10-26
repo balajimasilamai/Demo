@@ -1,0 +1,267 @@
+Unique key,Test case name,,
+1,Operating Companies(OCN) --EAST & WEST,,
+1,Verify all the applicable OCNs are migrated from both EAST and WEST to NGMSS,Verify all the applicable OCNs are migrated from both EAST and WEST to NGMSS,"( select operating_company_number,car.ocn_name from company@helinke c,carrie02.lerg_1@car00d10 car
+where car.ocn=c.operating_company_number and c.operating_company_number in 
+(select operating_company_number from staging_elnke.STG_INF_OPERATING_COMPANY)
+ minus
+select operating_company_number,car.ocn_name  from company@helinkw c,carrie02.lerg_1@car00d10 car
+where car.ocn=c.operating_company_number and operating_company_number in 
+(select operating_company_number from staging.stg_inf_operating_company)
+)
+union all
+( select operating_company_number,car.ocn_name from company@helinkw c,carrie02.lerg_1@car00d10 car
+where car.ocn=c.operating_company_number and c.operating_company_number in 
+(select operating_company_number from staging.STG_INF_OPERATING_COMPANY)
+ minus
+select operating_company_number,car.ocn_name  from company@helinke c,carrie02.lerg_1@car00d10 car
+where car.ocn=c.operating_company_number and operating_company_number in 
+(select operating_company_number from staging_elnke.stg_inf_operating_company)
+)
+ 
+ minus
+ select operating_company_number,OPERATING_COMPANY_NAME from company
+ ;"
+1,Verify and ensure no duplicate OCNs are available in NGMSS,Verify and ensure no duplicate OCNs are available in NGMSS,"select count(*),operating_company_name, operating_company_number 
+from company group by operating_company_name, operating_company_number having count(*)>1;"
+1,Verify the active indicator for the migrated OCN in NGMSS,Verify the active indicator for the migrated OCN in NGMSS,"select 'ELINKE' SOURCE,leg.operating_company_number,leg.operating_company_name leg_name,ng.operating_company_name ng_name,legp.active_ind leg_ind,ngp.active_ind ng_ind
+from staging_elnke.STG_INF_OPERATING_COMPANY stg,company@helinke leg,party@helinke legp,company ng,party ngp
+where stg.operating_company_number=leg.operating_company_number
+and legp.party_id=leg.party_id
+and stg.operating_company_number=ng.operating_company_number
+and ngp.party_id=ng.party_id
+and legp.active_ind<>ngp.active_ind
+union all
+select 'ELINKW' source,leg.operating_company_number,leg.operating_company_name leg_name,ng.operating_company_name ng_name,legp.active_ind leg_ind,ngp.active_ind ng_ind
+from staging.STG_INF_OPERATING_COMPANY stg,company@helinkw leg,party@helinkw legp,company ng,party ngp
+where stg.operating_company_number=leg.operating_company_number
+and legp.party_id=leg.party_id
+and stg.operating_company_number=ng.operating_company_number
+and ngp.party_id=ng.party_id
+and legp.active_ind<>ngp.active_ind
+;"
+1,Verify the TBS_OWNER_IND for the migrated OCN in NGMSS,Verify the TBS_OWNER_IND for the migrated OCN in NGMSS,"SELECT 'ELINKE' source,
+  leg.operating_company_number,
+  leg.operating_company_name leg_name,
+  ng.operating_company_name ng_name,
+  leg.tbs_owner_ind leg_ind,
+  ng.tbs_owner_ind ng_ind
+FROM staging_elnke.STG_INF_OPERATING_COMPANY stg,
+  company@helinke leg,
+  company ng
+WHERE stg.operating_company_number=leg.operating_company_number
+AND stg.operating_company_number  =ng.operating_company_number
+AND leg.tbs_owner_ind            <>ng.tbs_owner_ind
+UNION ALL
+SELECT 'ELINKW' source,
+  leg.operating_company_number,
+  leg.operating_company_name leg_name,
+  ng.operating_company_name ng_name,
+  leg.tbs_owner_ind leg_ind,
+  ng.tbs_owner_ind ng_ind
+FROM staging.STG_INF_OPERATING_COMPANY stg,
+  company@helinkw leg,
+  company ng
+WHERE stg.operating_company_number=leg.operating_company_number
+AND stg.operating_company_number  =ng.operating_company_number
+AND leg.tbs_owner_ind             <>ng.tbs_owner_ind;
+"
+1,Verify and ensure no duplicate party ids available for the migrated OCN in NGMSS,Verify and ensure no duplicate party ids available for the migrated OCN in NGMSS,"select count(*),party_id from company group by party_id having count(*)>1;"
+1,Verify party name and company name are equal for the migrated OCN in NGMSS,Verify party name and company name are equal for the migrated OCN in NGMSS,"SELECT * FROM (SELECT
+  CASE
+    WHEN p.party_name=c.operating_company_name
+    THEN 'MATCHED'
+    ELSE 'NOT MATCHED'
+  END AS Company_name_comp ,
+  p.party_name,
+  c.operating_company_name
+FROM
+  party p,
+  company c,
+  staging_elnke.STG_INF_OPERATING_COMPANY stg
+WHERE
+   stg.operating_company_number=c.operating_company_number
+and p.party_id                    =c.party_id)
+WHERE Company_name_comp='NOT MATCHED'
+;
+"
+1,Verify Party role type cd for the migrated OCN in NGMSS,Verify Party role type cd for the migrated OCN in NGMSS,"select * from
+(select case when (party_role_seq='1' and party_role_type_cd='COMPANY') then 'MATCHED' 
+            when party_role_seq='2' and party_role_type_cd='CUST' then 'MATCHED'
+            when party_role_seq='3' and party_role_type_cd='PROVIDER' then 'MATCHED' else 'NOT MATCHED'  end as result,
+            A.*
+FROM (SELECT
+ c.operating_company_number,pr.party_role_seq,pr.party_role_type_cd,
+ CASE  WHEN PR.party_role_seq='1' THEN 'COMPANY' 
+      WHEN PR.party_role_seq='2' THEN 'CUST'
+      WHEN PR.party_role_seq='3' THEN 'PROVIDER' end as role_type
+      
+      from 
+ 
+  party p,
+  party_role pr,
+  company c,
+  staging_elnke.STG_INF_OPERATING_COMPANY stg
+WHERE
+   stg.operating_company_number=c.operating_company_number
+and p.party_id                    =c.party_id
+and p.party_id=pr.party_id) A)
+where result='NOT MATCHED';"
+1,Verify Party role sequence for the migrated OCN in NGMSS,Verify Party role sequence for the migrated OCN in NGMSS,"select * from(
+SELECT
+  CASE
+    WHEN (ng_seq='1'
+    AND ng_type ='COMPANY')
+    THEN 'MATCHED'
+    WHEN ng_seq='2'
+    AND ng_type='CUST'
+    THEN 'MATCHED'
+    WHEN ng_seq='3'
+    AND ng_type='PROVIDER'
+    THEN 'MATCHED'
+    WHEN ng_seq='4'
+    AND ng_type='AC'
+    THEN 'MATCHED'
+    ELSE 'NOT MATCHED'
+  END AS result,
+  A.*
+FROM
+  (SELECT leg.operating_company_number,
+    leg.party_role_seq leg_seq,
+    leg.party_role_type_cd leg_type,
+    ng.party_role_seq ng_seq,
+    ng.party_role_type_cd ng_type
+  FROM
+    (SELECT c.operating_company_number,
+      pr.party_role_seq,
+      pr.party_role_type_cd
+    FROM party@helinke p,
+      party_role@helinke pr,
+      company@helinke c,
+      staging_elnke.STG_INF_OPERATING_COMPANY stg
+    WHERE stg.operating_company_number=c.operating_company_number
+    AND p.party_id                    =c.party_id
+    AND p.party_id                    =pr.party_id
+    ) leg,
+    (SELECT c.operating_company_number,
+      pr.party_role_seq,
+      pr.party_role_type_cd
+    FROM party p,
+      party_role pr,
+      company c,
+      staging_elnke.STG_INF_OPERATING_COMPANY stg
+    WHERE stg.operating_company_number=c.operating_company_number
+    AND p.party_id                    =c.party_id
+    AND p.party_id                    =pr.party_id
+    ) ng
+  WHERE leg.operating_company_number=ng.operating_company_number
+  AND leg.party_role_seq           <>ng.party_role_seq
+  AND LEG.party_role_type_cd        =NG.party_role_type_cd
+  ORDER BY operating_company_number
+  ) a)"
+2,Check List (E&W),,
+2,Verify the migrated Checklist data has distinct records and the individual records from Source,Verify the migrated Checklist data has distinct records and the individual records from Source,"(select CHKLIST_CD,DESCRIPTION from chktyp@helinke
+   union
+   select CHKLIST_CD,DESCRIPTION from chktyp@helinkw)
+  minus
+    select CHKLIST_CD,DESCRIPTION from chktyp"
+3,ACTL(EAST),,
+3,Verify the existing ACTL are present in NGMSS with respective Network Location,Verify the existing ACTL are present in NGMSS with respective Network Location,"SELECT *
+FROM network_location a
+WHERE NOT EXISTS
+  (SELECT clli_code
+  FROM network_location@helinke b,
+    staging_elnke.aref_network_location aref
+  where clli_code=a.clli_code
+  and b.clli_code=aref.mss_clli_code
+  );"
+3,Verify and ensure there are no duplicate entries in Network Location for migrated ACTL,Verify and ensure there are no duplicate entries in Network Location for migrated ACTL,"select count(*),nl.clli_code,nl.location_id
+from network_location nl,actl ac
+where nl.location_id=ac.location_id
+group by nl.clli_code,nl.location_id
+having count(*)>1;"
+3,Verify the migrated ACTL/Gateway Network Locations and Names are matched with source data ,Verify the migrated ACTL/Gateway Network Locations and Names are matched with source data ,"select nl.clli_code,nl.location_name
+from network_location@helinke nl,actl@helinke ac,STAGING_elnke.aref_network_location aref
+where nl.location_id=ac.location_id
+and aref.mss_clli_code=nl.clli_code
+minus
+
+select nl.clli_code,nl.location_name
+from network_location nl,actl ac
+where nl.location_id=ac.location_id
+;"
+3,"Verify the Geographical area, location Name and exchange area for the migrated ACTL/Gateway","Verify the Geographical area, location Name and exchange area for the migrated ACTL/Gateway","select nl.clli_code,EXCHANGE_AREA_CLLI,location_name,H_COORDINATE,V_COORDINATE,LONGITUDE,LATITUDE
+from network_location@helinke nl,actl@helinke ac,STAGING_elnke.aref_network_location aref
+where nl.location_id=ac.location_id
+and aref.mss_clli_code=nl.clli_code
+minus
+
+select nl.clli_code,EXCHANGE_AREA_CLLI,location_name,H_COORDINATE,V_COORDINATE,LONGITUDE,LATITUDE
+from network_location nl,actl ac
+where nl.location_id=ac.location_id;"
+4,ACTL(WEST),,
+4,Verify the existing ACTL are present in NGMSS with respective Network Location,Verify the existing ACTL are present in NGMSS with respective Network Location,"SELECT *
+FROM network_location a
+WHERE NOT EXISTS
+  (SELECT clli_code
+  FROM network_location@helinkw b,
+    staging.aref_network_location aref
+  where clli_code=a.clli_code
+  and b.clli_code=aref.mss_clli_code
+  );"
+4,Verify and ensure there are no duplicate entries in Network Location for migrated ACTL,Verify and ensure there are no duplicate entries in Network Location for migrated ACTL,"select count(*),nl.clli_code,nl.location_id
+from network_location nl,actl ac
+where nl.location_id=ac.location_id
+group by nl.clli_code,nl.location_id
+having count(*)>1;"
+4,Verify the migrated ACTL/Gateway Network Locations and Names are matched with source data ,Verify the migrated ACTL/Gateway Network Locations and Names are matched with source data ,"select nl.clli_code,nl.location_name
+from network_location@helinkw nl,actl@helinkw ac,STAGING.aref_network_location aref
+where nl.location_id=ac.location_id
+and aref.mss_clli_code=nl.clli_code
+minus
+
+select nl.clli_code,nl.location_name
+from network_location nl,actl ac
+where nl.location_id=ac.location_id
+;"
+4,"Verify the Geographical area, location Name and exchange area for the migrated ACTL/Gateway","Verify the Geographical area, location Name and exchange area for the migrated ACTL/Gateway","select nl.clli_code,EXCHANGE_AREA_CLLI,location_name,H_COORDINATE,V_COORDINATE,LONGITUDE,LATITUDE
+from network_location@helinkw nl,actl@helinkw ac,STAGING.aref_network_location aref
+where nl.location_id=ac.location_id
+and aref.mss_clli_code=nl.clli_code
+minus
+
+select nl.clli_code,EXCHANGE_AREA_CLLI,location_name,H_COORDINATE,V_COORDINATE,LONGITUDE,LATITUDE
+from network_location nl,actl ac
+where nl.location_id=ac.location_id;"
+5,Network Location Type,,
+5,Verify the existing NGMSS Location Types are not misaligned with different Network Location Category,Verify the existing NGMSS Location Types are not misaligned with different Network Location Category,"select ng.clli_code,nlt.location_type,location_category
+FROM ASAP.network_location@helinke ng,network_location_type@helinke nlt,STAGING_elnke.AREF_NETWORK_LOCATION mig,
+net_loc_type_category@helinke cat
+where 
+ng.clli_code=mig.mss_clli_code 
+and ng.net_loc_type_id=nlt.net_loc_type_id and cat.net_loc_type_cat_cd=nlt.net_loc_type_cat_cd
+and source='MSSELNKE'
+--and clli_code='ABTWTNXA'
+minus
+select ng.clli_code,nlt.location_type,location_category
+FROM ASAP.network_location ng,STAGING_elnke.AREF_NETWORK_LOCATION mig,network_location_type nlt,
+net_loc_type_category cat
+where ng.location_id=mig.mss_location_id  and cat.net_loc_type_cat_cd=nlt.net_loc_type_cat_cd
+and 
+ng.net_loc_type_id=nlt.net_loc_type_id and source='MSSELNKE'
+--and clli_code='ABTWTNXA'
+;
+ "
+5,Verify the additional data for Network Location Types present in Legacy is migrated to NGMSS,Verify the additional data for Network Location Types present in Legacy is migrated to NGMSS,"SELECT upper(nlt.location_type),location_category
+FROM network_location_type@helinke nlt,
+net_loc_type_category@helinke cat
+where 
+ cat.net_loc_type_cat_cd=nlt.net_loc_type_cat_cd
+
+minus
+
+SELECT upper(nlt.location_type),location_category
+FROM network_location_type nlt,
+net_loc_type_category cat
+where 
+ cat.net_loc_type_cat_cd=nlt.net_loc_type_cat_cd;"
+,,,
